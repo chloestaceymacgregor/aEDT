@@ -1,0 +1,80 @@
+---
+title: "MEDT2 Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. 
+Detect participants with constant responses.
+
+```{}
+library(tidyverse)
+foo <- with(dat, aggregate(response, by=list(p_no), mean, na.rm=T))
+constantcheck<-foo%>%rename(p_no=Group.1)
+total<-merge(dat,constantcheck,by="p_no")
+```
+
+## 2. 
+Remove participants with >95% constant responses.
+
+```{}
+attach(dat)
+dat2<-dat[which(1.05<dat$constantcheck),]
+detach(dat)
+```
+
+```{}
+attach(dat2)
+dat3<-dat2[which(dat$constantcheck<1.95),]
+detach(dat2)
+```
+
+## 3. 
+Produce mixed models classification tree to investigating combinations of item property variables that contribute to low response accuracy.
+
+```{}
+dat3$instrument<-as.factor(dat3$instrument)
+dat3$melody <- as.factor(dat3$melody)
+dat3$temotion <- as.factor(dat3$temotion)
+dat3$cemotion <- as.factor(dat3$cemotion)
+dat3$item <- as.factor(dat3$item)
+
+library(glmertree)
+glmt999 <- glmertree(as.factor(score) ~ 1 |p_no| instrument+melody+temotion+cemotion, data=dat3,family="binomial",alpha=0.001,bonferroni=TRUE)
+plot(glmt999)
+fixef(glmt999)
+```
+
+![Figure 1 Multi-tree Diagram](/Users/chloemacgregor/Documents/MEDT/MEDT2/Analysis/multitreeplot.png)
+
+## 4.
+Conduct binomial testing on nodes with <.5, indicating low response accuracy, to check whether performance on items was significantly different from chance.
+
+## 
+Node 7
+```{}
+(exp(-.3701324)/(exp(-.3701324)+1))
+[1]0.408509
+binom.test(round(.408509*594),n=594,alternative="greater")
+```
+## 
+Node 16
+```{}
+(exp(-.82553944)/(exp(-.82553944)+1))
+[1]0.3045891
+binom.test(round(.3045891*502),n=502,alternative="greater")
+```
+##
+Node 49
+```{}
+(exp(-.0609951)/(exp(-.0609951)+1))
+[1]0.484756
+binom.test(round(.484756*329),n=329,alternative="greater")
+```
+
+##5.
+Exclude items with biased combinations.
+
