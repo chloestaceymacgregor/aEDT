@@ -1,0 +1,168 @@
+---
+title: "MEDT2 Data Pre-Processing"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Raw dataset: N=659 
+
+Items: N=568
+
+Dataset with participants that responded to <50% of items excluded: N=623
+
+## 1. 
+Detect participants with constant responses.
+
+```{}
+library(tidyverse)
+foo <- with(dat, aggregate(response, by=list(p_no), mean, na.rm=T))
+constantcheck<-foo%>%rename(p_no=Group.1)
+dat2<-merge(dat,constantcheck,by="p_no")
+```
+
+## 2. 
+Remove participants with >95% constant responses.
+
+```{}
+attach(dat2)
+dat3<-dat2[which(1.05<dat2$x),]
+detach(dat2)
+```
+
+```{}
+attach(dat3)
+dat4<-dat3[which(dat3$x<1.95),]
+detach(dat3)
+```
+
+N=621
+
+## 3. 
+Produce mixed models classification tree to investigating combinations of item property variables that contribute to low response accuracy.
+
+```{}
+library(plyr)
+dat4$score <- as.factor(dat4$score)
+dat4$score <- revalue(dat4$score,c("1"="correct","0"="incorrect"))
+dat4$instrument <- as.factor(dat4$instrument)
+dat4$instrument <- revalue (dat4$instrument,
+                          c("1" = "flute", "2" = "piano", "3" = "violin", "4" = "voice"))
+dat4$temotion <- as.factor(dat4$temotion)
+dat4$temotion <- revalue(dat4$temotion,
+                       c("1" = "anger", "2" = "fear", "3" = "happy", "4" = "sad", "5" = "tender"))
+dat4$cemotion <- as.factor(dat4$cemotion)
+dat4$cemotion <- revalue(dat4$cemotion,
+                       c("1" = "anger", "2" = "fear", "3" = "happy", "4" = "sad", "5" = "tender"))
+dat4$melody <- as.factor(dat4$melody)
+dat4$melody <- revalue(dat4$melody,
+                      c("1" = "a", "2" = "b", "3" = "c"))
+```
+
+```{}
+library(glmertree)
+glmt999 <- glmertree(as.factor(score) ~ 1 |p_no| instrument+melody+temotion+cemotion, data=dat4,family="binomial",alpha=0.001,bonferroni=TRUE)
+plot(glmt999)
+fixef(glmt999)
+```
+
+![Figure 1 Multi-tree Diagram](/Users/chloemacgregor/Documents/MEDT/MEDT2/Analysis/diagrams/multitreeplot.png  )
+
+## 4.
+Conduct binomial testing on nodes <0.5 or near this threshold, indicating low response accuracy, to check whether performance on items was significantly different from chance.
+
+Node 7
+```{}
+(exp(-.3701324)/(exp(-.3701324)+1))
+[1]0.408509
+binom.test(round(.408509*594),n=594,alternative="greater")
+```
+p=1
+
+Node 16
+```{}
+(exp(-.82553944)/(exp(-.82553944)+1))
+[1]0.3045891
+binom.test(round(.3045891*502),n=502,alternative="greater")
+```
+p=1
+
+Node 21:
+```{}
+(exp(0.5100110)/(exp(0.5100110)+1))
+[1] 0.6248091
+binom.test(round(0.6248091*746),n=746,alternative="greater")
+```
+p<.05 
+
+Node 22:
+```{}
+(exp(0.3395369)/(exp(0.3395369)+1))
+[1] 0.584078
+binom.test(round(0.584078*1197),n=1197,alternative="greater")
+```
+p<.05 
+
+
+Node 49
+```{}
+(exp(-.0609951)/(exp(-.0609951)+1))
+[1]0.484756
+binom.test(round(.484756*329),n=329,alternative="greater")
+```
+p=.746
+
+## 5.
+Gather items based on feature combinations that were identified by the mixed models classification tree as associated with low accuracy 
+
+Node 7:
+```{}
+e1<-filter(dat4,instrument=="2"|instrument=="3")
+e2<-filter(e1,melody=="1" | melody=="2")
+e3<-filter(e2,temotion=="1" | temotion=="2" | temotion=="3")
+e4<-filter(e3,cemotion=="1"|cemotion=="3")
+attach(e4)
+node7items<-aggregate(e4,by=list(item),FUN=mode)
+detach(e4)
+node7items<-node7items[-c(2:19)]
+```
+
+Node 16:
+```{}
+e5<-filter(dat3,instrument=="2"|instrument=="3")
+e6<-filter(e5,melody=="3")
+e7<-filter(e6,temotion=="1")
+e8<-filter(e7,cemotion=="3")
+attach(e8)
+node16items<-aggregate(e8, by=list(item),FUN=mode)
+detach(e8)
+node16items<-node16items[-c(2:19)]
+```
+
+
+Node 49:
+```{}
+e9<-filter(dat3,instrument=="2"|instrument=="3")
+e10<-filter(e9,melody=="3")
+e11<-filter(e10,temotion=="1")
+e12<-filter(e11,cemotion=="3")
+attach(e12)
+node49items<-aggregate(e12, by=list(item),FUN=mode)
+detach(e12)
+node49items<-node49items[-c(2:19)]
+```
+
+```{}
+biaseditems<-rbind(node7items,node16items,node49items)
+biaseditems$item<-biaseditems$Group.1
+```
+
+
+## 6.
+Remove biased items from dataset.
+```{}
+library(dplyr)
+clean<-anti_join(dat4,biaseditems,by="item")
+```
+Items remaining: N=537
