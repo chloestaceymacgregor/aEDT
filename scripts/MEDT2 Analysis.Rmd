@@ -3,60 +3,64 @@ title: "MEDT2 Analysis"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## 1.
 ***Load data and convert categorical variables to factors.***
 
-```{}
+```{r prepare}
 library(plyr)
-data<-read.csv("/Users/chloemacgregor/Documents/MEDT/MEDT2/Analysis/cleandata.csv")
-data$score<-as.factor(data$score)
-data$score <- factor(data$score,
-        levels=c(1,0),
-        labels=c("correct","incorrect"))
+
+data$score <- as.factor(data$score)
+data$score <- factor(data$score, 
+                     levels = c(1,0), 
+                     labels = c("correct","incorrect"))
+
 data$instrument <- as.factor(data$instrument)
 data$instrument <- factor(data$instrument,
-        levels=c(1,2,3,4),
-        labels=c("flute","piano","violin","voice"))
+                          levels = c(1,2,3,4),
+                          labels =c ("flute","piano","violin","voice"))
+                          
 data$temotion <- as.factor(data$temotion)
 data$temotion <- factor(data$temotion,
-        levels=c(1,2,3,4,5),
-        labels=c("anger","fear","happy","sad","tender"))
+                        levels = c(1, 2, 3, 4, 5),
+                        labels = c("anger","fear","happy","sad","tender"))
+                        
 data$cemotion <- as.factor(data$cemotion)
 data$cemotion <- factor(data$cemotion,
-        levels=c(1,2,3,4,5),
-        labels=c("anger","fear","happy","sad","tender"))
+                        levels = c(1, 2, 3, 4, 5),
+                        labels = c("anger","fear","happy","sad","tender"))
+                        
 data$melody <- as.factor(data$melody)
 data$melody <- factor(data$melody,
-        levels=c(1,2,3),
-        labels=c("a","b","c"))
+                      levels=  c(1, 2, 3),
+                      labels = c("a","b","c"))
 ```
 
 ## 2.
 ***Build random forest model to check relationships between variables.***
 
-```{}
+```{r tree}
 library(party)
 my_var <- c("score","temotion","cemotion",
            "instrument","tbpm","cbpm",
-           "tlengths","clengths", "melody")
-forest_dat <- data(c[,my_var])
+           "melody")
+
+forest_dat <- data[, my_var]
 forest_dat <- na.omit(forest_dat)
 
 tree <- ctree(score ~ ., data = forest_dat)
-plot(tree)
 ```
 
-![Figure 1 Random Forest Diagram](/Users/chloemacgregor/Documents/MEDT/MEDT2/Analysis/diagrams/randomforestplot.png)
-```{}
+![Figure 1 Random Forest Diagram](./randomforestplot.png)
+```{r forest}
 mycontrols <- cforest_unbiased(ntree = 100,
                                mtry = 3,
                                minsplit = 5)
 
-set.seed(1612)
+set.seed(80121)
 
 forest <- cforest(score ~ .,
                   data = forest_dat,
@@ -65,13 +69,10 @@ forest <- cforest(score ~ .,
 forest_pred <- predict(forest,
                        OOB = TRUE)
 
-
-forest_pred<-as.numeric(forest_pred)
-data$score<-as.numeric(data$score)
+forest_pred <- as.numeric(forest_pred)
+data$score <- as.numeric(data$score)
 acc <- cor(forest_pred, data$score)^2
 acc
-
-[1] 0.02609917
 
 myvarimp <- varimp(forest)
 barplot(myvarimp[1:9], space = 0.20, xlim = c(0,0.04),
@@ -82,42 +83,30 @@ barplot(myvarimp[1:9], space = 0.20, xlim = c(0,0.04),
         las = 1)
 ```
 
-![Figure 1 Barchart illustrating Variable importance](/Users/chloemacgregor/Documents/MEDT/MEDT2/Analysis/diagrams/barchart.png)
+![Figure 1 Barchart illustrating Variable importance](./graphs/barchart.png)
 
 ##  3.
 ***Use important variables as predictors and experiment with building models.***
 
-```{}
-library(lme4)
-library(psyphy)
-
-data<-read.csv("/Users/chloemacgregor/Documents/MEDT/MEDT2/Analysis/cleandata.csv")
-data$score<-as.factor(data$score)
-data$instrument<-as.factor(data$instrument)
-data$temotion<-as.factor(data$temotion)
-data$cemotion<-as.factor(data$cemotion)
-data$melody<-as.factor(data$melody)
-data$tbpm<-scale(data$tbpm)
-data$cbpm<-scale(data$cbpm)
-```
-
 **M1** with all predictors and interactions
-```{}
-m1 <- glmer(score ~ instrument + melody+cbpm*tbpm + cemotion*temotion + cemotion:temotion:instrument +  cemotion:temotion:instrument:melody+ (1|p_no),  data = data,
+```{r m1}
+library(lme4)
+m1 <- glmer(score ~ instrument + melody + cbpm*tbpm + cemotion*temotion +
+                    cemotion:temotion:instrument + 
+                    cemotion:temotion:instrument:melody + 
+                    (1|p_no),  
+            data = data,
             family = binomial)
 summary(m1)
 ```
-BIC: 17504
 
 
-```{}
-m1 <- glmer(score ~ cemotion + temotion +(1|p_no),
+```{r m1}
+m1 <- glmer(score ~ cemotion + temotion + (1|p_no),
             data = data,
             family = binomial(logit.2asym(0.25, 0.01)))
 summary(m1)
 ```
-
-BIC:17504
 
 Sig predictors:
 C-fear
@@ -127,45 +116,45 @@ T-happy
 T-sad
 T-tender
 
-```{}
-pred1 <- predict(m1, type = "response")
-acc.tab1 <- table(data$score, round(pred1))
+```{r acc1}
+pred1 <- predict(m1, 
+                 type = "response")
+acc.tab1 <- table(data$score,
+                  round(pred1))
 accuracy1 <- sum(diag(acc.tab1)) / sum(acc.tab1)
 accuracy1
-[1] 0.7697372
 ```
 Prediction accuracy: 77%
 
 
 **M2** with two predictors (tpbm+cbpm)
-```{}
-m2 <- glmer(score ~ scale(cbpm) + scale(tbpm) +(1|p_no),
+```{r m2}
+m2 <- glmer(score ~ scale(cbpm) + scale(tbpm) + (1|p_no),
             data = data,
             family = binomial(logit.2asym(0.25, 0.01)))
 summary(m2)
 ```
 
-BIC:17383
-
 Sig Predictiors:
 tbpm
 cbpm
 
-```{}
-pred2 <- predict(m2, type = "response")
-acc.tab2 <- table(data$score, round(pred2))
+```{r acc2}
+pred2 <- predict(m2, 
+                 type = "response")
+acc.tab2 <- table(data$score, 
+                  round(pred2))
 accuracy2 <- sum(diag(acc.tab2)) / sum(acc.tab2)
 accuracy2
-[1] 0.7695577
 ```
 Prediction accuracy: 77%
 
-Second model preffered based on BIC figure.
+Second model prefered based on BIC figure.
 
 **M3** with three predictors(tbpm, cbpm, melody)
 
-```{}
-m3 <- glmer(score ~ scale(cbpm) + scale(tbpm) + melody+ (1|p_no),
+```{r m3}
+m3 <- glmer(score ~ scale(cbpm) + scale(tbpm) + melody + (1|p_no),
             data = data,
             family = binomial(logit.2asym(0.25, 0.01)))
 summary(m3)
@@ -179,12 +168,13 @@ cbpm
 melody b
 melody c
 
-```{}
-pred3 <- predict(m3, type = "response")
-acc.tab3 <- table(data$score, round(pred3))
+```{r acc3}
+pred3 <- predict(m3, 
+                 type = "response")
+acc.tab3 <- table(data$score, 
+                  round(pred3))
 accuracy3 <- sum(diag(acc.tab3)) / sum(acc.tab3)
 accuracy3
-[1] 0.7679416
 ```
 
 Prediction Accuracy: 77%
@@ -195,15 +185,15 @@ M3 preferred based on lower BIC figure.
 ***Compare Models.***
 
 ```{}
-anova(m1,m3)
+anova(m1, m3)
 ```
 
 No significant difference.
 
 ```{}
-anova(m2,m3)
+anova(m2, m3)
 ```
-***p<.05***
+***p < .05***
 
 ## 5.
 
