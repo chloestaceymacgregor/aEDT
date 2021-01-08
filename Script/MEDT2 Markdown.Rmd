@@ -392,41 +392,42 @@ loo(bm4)
 
 ### BM4 Output
 ```{}
-Family: bernoulli 
+ Family: bernoulli 
   Links: mu = identity 
 Formula: score ~ guess + (1 - guess - inatt) * inv_logit(eta) 
          eta ~ 0 + tece + melody + instrument + (1 | p_no)
          guess ~ 1
          inatt ~ 1
-   Data: data2 (Number of observations: 13016) 
+   Data: data1 (Number of observations: 16707) 
 Samples: 4 chains, each with iter = 15000; warmup = 7500; thin = 1;
          total post-warmup samples = 30000
 
 Group-Level Effects: 
 ~p_no (Number of levels: 621) 
                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-sd(eta_Intercept)     7.91      1.12     5.84    10.27 1.00     3623     7065
+sd(eta_Intercept)     6.44      0.91     4.81     8.37 1.00     2275     4983
 
 Population-Level Effects: 
                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-eta_tece14          3.01      0.94     1.29     4.98 1.00     4250     7196
-eta_tece32         -6.72      1.51    -9.90    -3.96 1.00     9136    13873
-eta_tece34          3.39      1.01     1.53     5.51 1.00     4246     7907
-eta_tece35          3.78      1.00     1.98     5.90 1.00     3459     7215
-eta_tece41          3.60      0.97     1.83     5.64 1.00     4302     7986
-eta_tece43          1.69      0.87     0.08     3.52 1.00     4582     8975
-eta_tece45        -16.98      2.23   -21.61   -12.91 1.00     6248    12411
-eta_tece51          2.21      0.89     0.57     4.06 1.00     5017     9904
-eta_tece52         -6.82      1.57   -10.16    -3.98 1.00     9571    17856
-eta_tece53          3.78      0.94     2.09     5.76 1.00     3671     7261
-eta_tece54        -10.42      1.66   -13.86    -7.35 1.00     7146    12995
-eta_melodyb         0.77      0.43    -0.05     1.66 1.00    13703    18183
-eta_melodyc        -4.76      0.68    -6.20    -3.52 1.00     5230     9148
-eta_instrument2     2.28      0.60     1.14     3.49 1.00     9493    13665
-eta_instrument3     2.99      0.63     1.79     4.29 1.00     9293    13917
-eta_instrument4     5.40      0.78     3.96     7.02 1.00     5899     9954
-guess_Intercept     0.50      0.00     0.50     0.50 1.00    30980    15707
-inatt_Intercept     0.06      0.00     0.05     0.07 1.00     4189    10427
+eta_tece13          2.67      1.01     0.81     4.78 1.00     2854     6096
+eta_tece14          5.82      1.10     3.83     8.13 1.00     2355     4657
+eta_tece15          5.15      1.06     3.23     7.37 1.00     2331     4589
+eta_tece25         -1.25      1.64    -4.81     1.59 1.00     4807    10926
+eta_tece31          2.71      0.93     1.01     4.64 1.00     2931     6192
+eta_tece32         -4.49      1.20    -7.01    -2.32 1.00     8558    15543
+eta_tece34          6.21      1.18     4.08     8.68 1.00     2325     4622
+eta_tece35          6.93      1.27     4.64     9.59 1.00     2148     4403
+eta_tece41          6.33      1.13     4.27     8.69 1.00     2343     4824
+eta_tece43          4.99      1.08     3.04     7.26 1.00     2503     5229
+eta_tece45        -14.90      2.32   -19.94   -10.86 1.00     6985    14198
+eta_tece51          5.09      1.04     3.22     7.27 1.00     2486     5010
+eta_tece52         -4.74      1.40    -7.73    -2.19 1.00     9698    14045
+eta_tece53          6.78      1.21     4.65     9.32 1.00     2233     4528
+eta_tece54         -5.23      1.35    -8.06    -2.81 1.00     7405    12974
+eta_melody         -3.18      0.45    -4.14    -2.37 1.00     2276     4385
+eta_instrument      1.58      0.21     1.20     2.02 1.00     4069     9555
+guess_Intercept     0.50      0.00     0.50     0.50 1.00    32782    15852
+inatt_Intercept     0.06      0.00     0.05     0.07 1.00     3723     9786
 
 Samples were drawn using sampling(NUTS). For each parameter, Bulk_ESS
 and Tail_ESS are effective sample size measures, and Rhat is the potential
