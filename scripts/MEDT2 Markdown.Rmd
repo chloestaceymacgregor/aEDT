@@ -1,0 +1,271 @@
+---
+title: "MEDT2 Analysis"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1.Load data, convert categorical variables to factors, rescale continuous variables and remove highly correlated variables.
+
+```{r prepare}
+library(plyr)
+
+data <- read.csv("./data/cleandata.csv")
+
+data$score <- as.factor(data$score)
+data$score <- factor(data$score, 
+                     levels = c(1,0), 
+                     labels = c("correct","incorrect"))
+
+data$instrument <- as.factor(data$instrument)
+data$instrument <- factor(data$instrument,
+                          levels = c(1,2,3,4),
+                          labels =c ("flute","piano","violin","voice"))
+                          
+data$temotion <- as.factor(data$temotion)
+data$temotion <- factor(data$temotion,
+                        levels = c(1, 2, 3, 4, 5),
+                        labels = c("anger","fear","happy","sad","tender"))
+                        
+data$cemotion <- as.factor(data$cemotion)
+data$cemotion <- factor(data$cemotion,
+                        levels = c(1, 2, 3, 4, 5),
+                        labels = c("anger","fear","happy","sad","tender"))
+                        
+data$melody <- as.factor(data$melody)
+data$melody <- factor(data$melody,
+                      levels=  c(1, 2, 3),
+                      labels = c("a","b","c"))
+                      
+data$tbpm <- scale(data$tbpm)
+data$cbpm <- scale(data$cbpm)
+```
+
+## 2.Build random forest model to check relationships between variables.
+
+```{r tree}
+library(party)
+
+my_var <- c("score","temotion","cemotion",
+            "instrument","tbpm","cbpm",
+            "melody")
+
+forest_dat <- data[, my_var]
+forest_dat <- na.omit(forest_dat)
+
+tree <- ctree(score ~ ., data = forest_dat)
+```
+
+![Figure 1 Random Forest Diagram](./graphs/randomforestplot.png)
+```{r forest}
+mycontrols <- cforest_unbiased(ntree = 100,
+                               mtry = 3,
+                               minsplit = 5)
+
+set.seed(80121)
+
+forest <- cforest(score ~ .,
+                  data = forest_dat,
+                  controls = mycontrols)
+
+forest_pred <- predict(forest,
+                       OOB = TRUE)
+
+
+forest_pred <- as.numeric(forest_pred)
+data$score <- as.numeric(data$score)
+acc <- cor(forest_pred, data$score)^2
+acc
+
+myvarimp <- varimp(forest)
+barplot(myvarimp[1:9], space = 0.20, xlim = c(0,0.04),
+        names.arg = rownames(myvarimp)[1:9],
+        horiz = TRUE,
+        cex.names = 0.8,
+        cex = 0.8,
+        las = 1)
+```
+
+![Figure 1 Barchart illustrating Variable importance](./graphs/barchart.png)
+
+##  3. Model building.
+
+**MODEL 1 with all predictors and interactions **
+Model with the formula 
+score ~ instrument + melody + cbpm*tbpm + 
+              cemotion*temotion +
+              cemotion:temotion:instrument + 
+              cemotion:temotion:instrument:melody + 
+              (1|p_no)
+failed to converge.
+
+**MODEL 2: temotion x cemotion**
+```{r model2}
+m2 <- glmer(score ~ temotion*cemotion + 
+              (1|p_no),  
+            data = data,
+            family = binomial)
+summary(m2)
+```
+
+**MODEL 3: cemotion**
+```{r model3}
+m3 <- glmer(score ~ cemotion + (1|p_no),  
+            data = data,
+            family = binomial)
+summary(m3)
+```
+
+**MODEL 4: temotion + cemotion**
+```{r model4}
+m4 <- glmer(score ~ cemotion + temotion + (1|p_no),  
+            data = data,
+            family = binomial)
+summary(m4)
+```
+
+**MODEL 5: cemotion + cbpm**
+```{r model5}
+m5 <- glmer(score ~ cemotion + cbpm + (1|p_no),  
+            data = data,
+            family = binomial)
+summary(m5)
+```            
+
+**MODEL 6: temotion**
+```{r model6}
+m6 <- glmer(score ~ temotion + (1|p_no),  
+            data = data,
+            family = binomial)
+summary(m6)
+```
+
+## Combine emotion factors into temotion*cemotion to interaction variable 'tece'
+```{r tece}
+data$tece <- paste(data$temotion, 
+                   data$cemotion,
+                   sep="")
+
+data$tece <- as.factor(data$tece)
+table(data$tece)
+```
+
+## Build new model with combined factor
+```{r model8}
+m8 <- glmer(score ~ tece + (1|p_no),  
+            data = data,
+            family = binomial)
+summary(m8)
+```
+
+## Fit Model using brms instead
+
+### Combine tbpm & cbpm ("tcbpm")
+```{r tcbpm}
+data$tcbpm <- (data$tbpm-data$cbpm)
+data$tcbpm <- scale(data$tcbpm)
+```
+
+### BModel 1: all variables
+```{r bmodel1}
+library(brms)
+
+data$guess <- .5
+
+bm1 <- brm(score ~ tece + melody + tcbpm + instrument + (1|p_no), 
+           data = data, 
+           family = bernoulli())
+summary(bm1)
+waic(bm1)
+```
+
+### BModel 2: all variables plus guessing parameter
+```{r bmodel2}
+bm2 <- brm(bf(score~ guess + (1 - guess - inatt) * inv_logit(eta),
+              eta ~ 0 + tece + melody + tcbpm + instrument + (1|p_no), 
+              guess ~ 1, 
+              inatt ~ 1, 
+              nl = TRUE),
+           data = data, 
+           family = bernoulli("identity"),
+           prior = c(prior(normal(0, 5), 
+                           nlpar = "eta"),
+                     prior(beta(1, 1), 
+                           nlpar = "guess", 
+                           lb = 0, 
+                           ub = 0.5),
+                     prior(beta(1, 1), 
+                           nlpar = "inatt",
+                           lb = 0, 
+                           ub = 0.1)))
+summary(bm2)
+waic(bm2)
+```
+
+### Bmodel 3: 10000 iterations
+```{r bmodel3}
+bm3 <- brm(bf(score ~ guess + (1 - guess - inatt) * inv_logit(eta),
+              eta ~ 0 + tece + melody + tcbpm + instrument + (1|p_no), 
+              guess ~ 1, 
+              inatt ~ 1, 
+              nl = TRUE),
+           data = data, 
+           family = bernoulli("identity"),
+           prior = c(prior(normal(0, 5), 
+                           nlpar = "eta"),
+                     prior(beta(1, 1), 
+                           nlpar = "guess", 
+                           lb = 0, 
+                           ub = 0.5),
+                     prior(beta(1, 1), 
+                           nlpar = "inatt", 
+                           lb = 0, 
+                           ub = 0.1)),
+           iter = 10000)
+summary(bm3)
+waic(bm3)
+loo(bm3)
+```
+
+## Remove non-significant variables: 
+tece13, 
+tece15,
+tece25,
+tece31,
+tcbpm
+
+```{r itemdrop}
+itemdrop_data <- subset(data, 
+                        tece != 13 & tece != 15 & tece != 25 & tece != 31)
+itemdrop_data <- subset(itemdrop_data, 
+                        select = c(2:12))
+```
+
+### BModel 4: Including only significant variables
+```{r bmodel4}
+bm4 <- brm(bf(score ~ guess + (1 - guess - inatt) * inv_logit(eta),
+              eta ~ 0 + tece + melody + instrument + (1|p_no), 
+              guess ~ 1, 
+              inatt ~ 1, 
+              nl = TRUE),
+           data = itemdrop_data, 
+           family = bernoulli("identity"),
+           prior = c(prior(normal(0, 5), 
+                           nlpar = "eta"),
+                     prior(beta(1, 1), 
+                           nlpar = "guess", 
+                           lb = 0, 
+                           ub = 0.5),
+                     prior(beta(1, 1), 
+                           nlpar = "inatt", 
+                           lb = 0, 
+                           ub = 0.1)),
+    iter = 15000
+)
+
+summary(bm4)
+waic(bm4)
+loo(bm4)
+```

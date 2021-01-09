@@ -1,0 +1,202 @@
+---
+title: "MEDT2 Analysis"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1.
+***Load data and convert categorical variables to factors.***
+
+```{r prepare}
+library(plyr)
+
+data$score <- as.factor(data$score)
+data$score <- factor(data$score, 
+                     levels = c(1,0), 
+                     labels = c("correct","incorrect"))
+
+data$instrument <- as.factor(data$instrument)
+data$instrument <- factor(data$instrument,
+                          levels = c(1,2,3,4),
+                          labels =c ("flute","piano","violin","voice"))
+                          
+data$temotion <- as.factor(data$temotion)
+data$temotion <- factor(data$temotion,
+                        levels = c(1, 2, 3, 4, 5),
+                        labels = c("anger","fear","happy","sad","tender"))
+                        
+data$cemotion <- as.factor(data$cemotion)
+data$cemotion <- factor(data$cemotion,
+                        levels = c(1, 2, 3, 4, 5),
+                        labels = c("anger","fear","happy","sad","tender"))
+                        
+data$melody <- as.factor(data$melody)
+data$melody <- factor(data$melody,
+                      levels=  c(1, 2, 3),
+                      labels = c("a","b","c"))
+```
+
+## 2.
+***Build random forest model to check relationships between variables.***
+
+```{r tree}
+library(party)
+my_var <- c("score","temotion","cemotion",
+           "instrument","tbpm","cbpm",
+           "melody")
+
+forest_dat <- data[, my_var]
+forest_dat <- na.omit(forest_dat)
+
+tree <- ctree(score ~ ., data = forest_dat)
+```
+
+![Figure 1 Random Forest Diagram](./randomforestplot.png)
+```{r forest}
+mycontrols <- cforest_unbiased(ntree = 100,
+                               mtry = 3,
+                               minsplit = 5)
+
+set.seed(80121)
+
+forest <- cforest(score ~ .,
+                  data = forest_dat,
+                  controls = mycontrols)
+
+forest_pred <- predict(forest,
+                       OOB = TRUE)
+
+forest_pred <- as.numeric(forest_pred)
+data$score <- as.numeric(data$score)
+acc <- cor(forest_pred, data$score)^2
+acc
+
+myvarimp <- varimp(forest)
+barplot(myvarimp[1:9], space = 0.20, xlim = c(0,0.04),
+        names.arg = rownames(myvarimp)[1:9],
+        horiz = TRUE,
+        cex.names = 0.8,
+        cex = 0.8,
+        las = 1)
+```
+
+![Figure 1 Barchart illustrating Variable importance](./graphs/barchart.png)
+
+##  3.
+***Use important variables as predictors and experiment with building models.***
+
+**M1** with all predictors and interactions
+```{r m1}
+library(lme4)
+m1 <- glmer(score ~ instrument + melody + cbpm*tbpm + cemotion*temotion +
+                    cemotion:temotion:instrument + 
+                    cemotion:temotion:instrument:melody + 
+                    (1|p_no),  
+            data = data,
+            family = binomial)
+summary(m1)
+```
+
+
+```{r m1}
+m1 <- glmer(score ~ cemotion + temotion + (1|p_no),
+            data = data,
+            family = binomial(logit.2asym(0.25, 0.01)))
+summary(m1)
+```
+
+Sig predictors:
+C-fear
+C-sad
+C-tender
+T-happy
+T-sad
+T-tender
+
+```{r acc1}
+pred1 <- predict(m1, 
+                 type = "response")
+acc.tab1 <- table(data$score,
+                  round(pred1))
+accuracy1 <- sum(diag(acc.tab1)) / sum(acc.tab1)
+accuracy1
+```
+Prediction accuracy: 77%
+
+
+**M2** with two predictors (tpbm+cbpm)
+```{r m2}
+m2 <- glmer(score ~ scale(cbpm) + scale(tbpm) + (1|p_no),
+            data = data,
+            family = binomial(logit.2asym(0.25, 0.01)))
+summary(m2)
+```
+
+Sig Predictiors:
+tbpm
+cbpm
+
+```{r acc2}
+pred2 <- predict(m2, 
+                 type = "response")
+acc.tab2 <- table(data$score, 
+                  round(pred2))
+accuracy2 <- sum(diag(acc.tab2)) / sum(acc.tab2)
+accuracy2
+```
+Prediction accuracy: 77%
+
+Second model prefered based on BIC figure.
+
+**M3** with three predictors(tbpm, cbpm, melody)
+
+```{r m3}
+m3 <- glmer(score ~ scale(cbpm) + scale(tbpm) + melody + (1|p_no),
+            data = data,
+            family = binomial(logit.2asym(0.25, 0.01)))
+summary(m3)
+```
+
+BIC:17234
+
+Sig predictors:
+tbpm
+cbpm
+melody b
+melody c
+
+```{r acc3}
+pred3 <- predict(m3, 
+                 type = "response")
+acc.tab3 <- table(data$score, 
+                  round(pred3))
+accuracy3 <- sum(diag(acc.tab3)) / sum(acc.tab3)
+accuracy3
+```
+
+Prediction Accuracy: 77%
+
+M3 preferred based on lower BIC figure.
+
+## 4. 
+***Compare Models.***
+
+```{}
+anova(m1, m3)
+```
+
+No significant difference.
+
+```{}
+anova(m2, m3)
+```
+***p < .05***
+
+## 5.
+
+***Decide which model fits data best.***
+
+**Model 3** : tbpm, cbpm, melody
