@@ -229,14 +229,7 @@ waic(bm3)
 loo(bm3)
 ```
 
-## Remove non-significant variables (tcbpm)
-
-```{r itemdrop}
-itemdrop_data <- subset(itemdrop_data, 
-                        select = c(2:12))
-```
-
-### BModel 4: Including only significant variables
+### BModel 4: Including only significant variables (remove tcbpm)
 ```{r bmodel4}
 bm4 <- brm(bf(score ~ guess + (1 - guess - inatt) * inv_logit(eta),
               eta ~ 0 + tece + melody + instrument + (1|p_no), 
