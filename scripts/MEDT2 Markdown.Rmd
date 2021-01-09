@@ -229,16 +229,9 @@ waic(bm3)
 loo(bm3)
 ```
 
-## Remove non-significant variables: 
-tece13, 
-tece15,
-tece25,
-tece31,
-tcbpm
+## Remove non-significant variables (tcbpm)
 
 ```{r itemdrop}
-itemdrop_data <- subset(data, 
-                        tece != 13 & tece != 15 & tece != 25 & tece != 31)
 itemdrop_data <- subset(itemdrop_data, 
                         select = c(2:12))
 ```
