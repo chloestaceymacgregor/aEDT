@@ -92,7 +92,7 @@ barplot(myvarimp[1:9], space = 0.20, xlim = c(0,0.04),
 
 ##  3. Model building.
 
-**MODEL 1 with all predictors and interactions **
+# MODEL 1 with all predictors and interactions 
 Model with the formula 
 score ~ instrument + melody + cbpm*tbpm + 
               cemotion*temotion +
@@ -101,7 +101,7 @@ score ~ instrument + melody + cbpm*tbpm +
               (1|p_no)
 failed to converge.
 
-**MODEL 2: temotion x cemotion**
+# MODEL 2: temotion x cemotion
 ```{r model2}
 m2 <- glmer(score ~ temotion*cemotion + 
               (1|p_no),  
@@ -110,7 +110,7 @@ m2 <- glmer(score ~ temotion*cemotion +
 summary(m2)
 ```
 
-**MODEL 3: cemotion**
+# MODEL 3: cemotion
 ```{r model3}
 m3 <- glmer(score ~ cemotion + (1|p_no),  
             data = data,
@@ -118,7 +118,7 @@ m3 <- glmer(score ~ cemotion + (1|p_no),
 summary(m3)
 ```
 
-**MODEL 4: temotion + cemotion**
+# MODEL 4: temotion + cemotion
 ```{r model4}
 m4 <- glmer(score ~ cemotion + temotion + (1|p_no),  
             data = data,
@@ -126,7 +126,7 @@ m4 <- glmer(score ~ cemotion + temotion + (1|p_no),
 summary(m4)
 ```
 
-**MODEL 5: cemotion + cbpm**
+# MODEL 5: cemotion + cbpm
 ```{r model5}
 m5 <- glmer(score ~ cemotion + cbpm + (1|p_no),  
             data = data,
@@ -134,7 +134,7 @@ m5 <- glmer(score ~ cemotion + cbpm + (1|p_no),
 summary(m5)
 ```            
 
-**MODEL 6: temotion**
+# MODEL 6: temotion
 ```{r model6}
 m6 <- glmer(score ~ temotion + (1|p_no),  
             data = data,
@@ -171,8 +171,6 @@ data$tcbpm <- scale(data$tcbpm)
 ### BModel 1: all variables
 ```{r bmodel1}
 library(brms)
-
-data$guess <- .5
 
 bm1 <- brm(score ~ tece + melody + tcbpm + instrument + (1|p_no), 
            data = data, 
@@ -229,28 +227,14 @@ waic(bm3)
 loo(bm3)
 ```
 
-## Remove non-significant variables: 
-tece13, 
-tece15,
-tece25,
-tece31,
-tcbpm
-
-```{r itemdrop}
-itemdrop_data <- subset(data, 
-                        tece != 13 & tece != 15 & tece != 25 & tece != 31)
-itemdrop_data <- subset(itemdrop_data, 
-                        select = c(2:12))
-```
-
-### BModel 4: Including only significant variables
+### BModel 4: Including only significant variables (remove tcbpm)
 ```{r bmodel4}
 bm4 <- brm(bf(score ~ guess + (1 - guess - inatt) * inv_logit(eta),
               eta ~ 0 + tece + melody + instrument + (1|p_no), 
               guess ~ 1, 
               inatt ~ 1, 
               nl = TRUE),
-           data = itemdrop_data, 
+           data = data, 
            family = bernoulli("identity"),
            prior = c(prior(normal(0, 5), 
                            nlpar = "eta"),
