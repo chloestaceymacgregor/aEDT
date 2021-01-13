@@ -15,9 +15,6 @@ library(plyr)
 data <- read.csv("./data/cleandata.csv")
 
 data$score <- as.factor(data$score)
-data$score <- factor(data$score, 
-                     levels = c(1,0), 
-                     labels = c("correct","incorrect"))
 
 data$instrument <- as.factor(data$instrument)
 data$instrument <- factor(data$instrument,
