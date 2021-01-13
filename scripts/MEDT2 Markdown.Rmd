@@ -254,9 +254,26 @@ loo(bm4)
 ## Compute R2 for bm4
 
 ```{r r2}
-rsq_bayes <- bayes_R2(bm4)
+rsq_bayes <- bayes_R2(bm4,
+                      resp = NULL,
+                      summary = T,
+                      robust = F,
+                      probs = c(0.025, 0.975)
+                      )
 
-hist(rsq_bayes)
+rsq_bayes
+```
 
-print(c(median(rsq_bayes), mean(rsq_bayes), sd(rsq_bayes)))
+## Compute accuracy for bm4
+
+```{r acc}
+predictions <- predict(bm4,
+                       type = "response")
+predictions <- predictions[,1]
+
+acc.tab <- table(data$score,
+                      round(predictions,
+                            digits = 0))
+acc_bm4 <- sum(diag(acc.tab)) / sum(acc.tab)
+acc_bm4
 ```
