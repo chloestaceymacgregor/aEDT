@@ -253,3 +253,14 @@ summary(bm4)
 waic(bm4)
 loo(bm4)
 ```
+## Compute R2 for bm4
+
+```{r r2}
+rsq_bayes <- bayes_R2(bm4)
+
+hist(rsq_bayes)
+
+print(c(median(rsq_bayes), mean(rsq_bayes), sd(rsq_bayes)))
+```
+
+
