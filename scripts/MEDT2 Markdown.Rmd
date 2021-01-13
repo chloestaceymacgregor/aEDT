@@ -15,9 +15,7 @@ library(plyr)
 data <- read.csv("./data/cleandata.csv")
 
 data$score <- as.factor(data$score)
-data$score <- factor(data$score, 
-                     levels = c(1,0), 
-                     labels = c("correct","incorrect"))
+# 0=incorrect, 1-correct
 
 data$instrument <- as.factor(data$instrument)
 data$instrument <- factor(data$instrument,
@@ -246,10 +244,19 @@ bm4 <- brm(bf(score ~ guess + (1 - guess - inatt) * inv_logit(eta),
                            nlpar = "inatt", 
                            lb = 0, 
                            ub = 0.1)),
-    iter = 15000
+    iter = 10000
 )
 
 summary(bm4)
 waic(bm4)
 loo(bm4)
+```
+## Compute R2 for bm4
+
+```{r r2}
+rsq_bayes <- bayes_R2(bm4)
+
+hist(rsq_bayes)
+
+print(c(median(rsq_bayes), mean(rsq_bayes), sd(rsq_bayes)))
 ```
