@@ -219,7 +219,7 @@ bm3 <- brm(bf(score ~ guess + (1 - guess - inatt) * inv_logit(eta),
                            nlpar = "inatt", 
                            lb = 0, 
                            ub = 0.1)),
-           iter = 10000)
+           iter = 5000)
 summary(bm3)
 waic(bm3)
 loo(bm3)
@@ -244,7 +244,7 @@ bm4 <- brm(bf(score ~ guess + (1 - guess - inatt) * inv_logit(eta),
                            nlpar = "inatt", 
                            lb = 0, 
                            ub = 0.1)),
-    iter = 10000
+    iter = 5000
 )
 
 summary(bm4)
