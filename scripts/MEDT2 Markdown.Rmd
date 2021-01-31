@@ -7,7 +7,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## 1.Load data, convert categorical variables to factors, rescale continuous variables and remove highly correlated variables.
+### 1.Load data, convert categorical variables to factors, rescale continuous variables and remove highly correlated variables.
 
 ```{r prepare}
 library(plyr)
@@ -41,7 +41,7 @@ data$tbpm <- scale(data$tbpm)
 data$cbpm <- scale(data$cbpm)
 ```
 
-## 2.Build random forest model to check relationships between variables.
+### 2.Build random forest model to check relationships between variables.
 
 ```{r tree}
 library(party)
@@ -88,18 +88,19 @@ barplot(myvarimp[1:9], space = 0.20, xlim = c(0,0.04),
 
 ![Figure 1 Barchart illustrating Variable importance](./graphs/barchart.png)
 
-##  3. Model building.
+###  3. Model building.
 
-# MODEL 1 with all predictors and interactions 
-Model with the formula 
+# Model 1 with all predictors and interactions 
+```{r model1}
+
 score ~ instrument + melody + cbpm*tbpm + 
               cemotion*temotion +
               cemotion:temotion:instrument + 
               cemotion:temotion:instrument:melody + 
               (1|p_no)
-failed to converge.
+```
 
-# MODEL 2: temotion x cemotion
+# Model 2: temotion x cemotion
 ```{r model2}
 m2 <- glmer(score ~ temotion*cemotion + 
               (1|p_no),  
@@ -108,7 +109,7 @@ m2 <- glmer(score ~ temotion*cemotion +
 summary(m2)
 ```
 
-# MODEL 3: cemotion
+# Model 3: cemotion
 ```{r model3}
 m3 <- glmer(score ~ cemotion + (1|p_no),  
             data = data,
@@ -116,7 +117,7 @@ m3 <- glmer(score ~ cemotion + (1|p_no),
 summary(m3)
 ```
 
-# MODEL 4: temotion + cemotion
+# Model 4: temotion + cemotion
 ```{r model4}
 m4 <- glmer(score ~ cemotion + temotion + (1|p_no),  
             data = data,
@@ -124,7 +125,7 @@ m4 <- glmer(score ~ cemotion + temotion + (1|p_no),
 summary(m4)
 ```
 
-# MODEL 5: cemotion + cbpm
+# Model 5: cemotion + cbpm
 ```{r model5}
 m5 <- glmer(score ~ cemotion + cbpm + (1|p_no),  
             data = data,
@@ -132,7 +133,7 @@ m5 <- glmer(score ~ cemotion + cbpm + (1|p_no),
 summary(m5)
 ```            
 
-# MODEL 6: temotion
+# Model 6: temotion
 ```{r model6}
 m6 <- glmer(score ~ temotion + (1|p_no),  
             data = data,
@@ -140,7 +141,7 @@ m6 <- glmer(score ~ temotion + (1|p_no),
 summary(m6)
 ```
 
-## Combine emotion factors into temotion*cemotion to interaction variable 'tece'
+### 4. Combine emotion factors into temotion*cemotion to interaction variable 'tece'
 ```{r tece}
 data$tece <- paste(data$temotion, 
                    data$cemotion,
@@ -150,21 +151,21 @@ data$tece <- as.factor(data$tece)
 table(data$tece)
 ```
 
-## Build new model with combined factor
+# Model 8: with combined factor
 ```{r model8}
 m8 <- glmer(score ~ tece + (1|p_no),  
             data = data,
             family = binomial)
 summary(m8)
 ```
-
-## Fit Model using brms instead
-
-### Combine tbpm & cbpm ("tcbpm")
+### 5. Combine tbpm & cbpm ("tcbpm")
 ```{r tcbpm}
 data$tcbpm <- (data$tbpm-data$cbpm)
 data$tcbpm <- scale(data$tcbpm)
 ```
+
+### 6. Fit Model using brms instead
+
 
 ### BModel 1: all variables
 ```{r bmodel1}
@@ -224,56 +225,110 @@ summary(bm3)
 waic(bm3)
 loo(bm3)
 ```
-
-### BModel 4: Including only significant variables (remove tcbpm)
+### BModel 4: added auto-priors
 ```{r bmodel4}
-bm4 <- brm(bf(score ~ guess + (1 - guess - inatt) * inv_logit(eta),
-              eta ~ 0 + tece + melody + instrument + (1|p_no), 
-              guess ~ 1, 
-              inatt ~ 1, 
-              nl = TRUE),
-           data = data, 
-           family = bernoulli("identity"),
-           prior = c(prior(normal(0, 5), 
-                           nlpar = "eta"),
-                     prior(beta(1, 1), 
-                           nlpar = "guess", 
-                           lb = 0, 
-                           ub = 0.5),
-                     prior(beta(1, 1), 
-                           nlpar = "inatt", 
-                           lb = 0, 
-                           ub = 0.1)),
-    iter = 5000
+
+
+library(sjstats)
+bm4<-formula(score~ tece+melody+instrument+(1|p_no))
+if(requireNamespace("brms",quietly=TRUE))
+  auto_prior(bm4,data,FALSE)
+
+library(brms)
+ac<-auto_prior(bm4,data,FALSE)
+bm4<-brm(bf(score ~ guess + (1 - guess - inatt) * inv_logit(eta),
+            eta ~ 0 + tece + melody + instrument + (1|p_no), 
+            guess ~ 1, 
+            inatt ~ 1, 
+            nl = TRUE),
+         data = data, 
+         family = bernoulli("identity"),
+         prior = c(prior(normal(0, 5), 
+                         nlpar = "eta"),
+                   prior(beta(1, 1), 
+                         nlpar = "guess", 
+                         lb = 0, 
+                         ub = 0.5),
+                   prior(beta(1, 1), 
+                         nlpar = "inatt", 
+                         lb = 0, 
+                         ub = 0.1)),
+         auto_prior(bm4,data,FALSE),
+         iter = 10000
 )
 
 summary(bm4)
-waic(bm4)
-loo(bm4)
 ```
-## Compute R2 for bm4
+
+### 7. Accept bm4 as final model and Compute R2
 
 ```{r r2}
+
+
 rsq_bayes <- bayes_R2(bm4,
                       resp = NULL,
                       summary = T,
                       robust = F,
                       probs = c(0.025, 0.975)
                       )
-
 rsq_bayes
 ```
 
-## Compute accuracy for bm4
-
+### 8. Compute accuracy for bm4
 ```{r acc}
+
+
 predictions <- predict(bm4,
                        type = "response")
 predictions <- predictions[,1]
-
 acc.tab <- table(data$score,
                       round(predictions,
                             digits = 0))
 acc_bm4 <- sum(diag(acc.tab)) / sum(acc.tab)
 acc_bm4
+```
+
+### 9. Derive item difficulty parameters
+
+## Collate items
+```{r itemparams}
+
+item.df <- unique(data[,c("item","tece","instrument","melody")])
+item.df$item_no <- seq(along=item.df[,1])
+MEDT2.items <- data.frame(
+  item_no <- item.df$item_no,
+  tece = item.df$tece,
+  instrument = item.df$instrument,
+  melody=item.df$melody
+)
+```
+## Calculate discrimination parameter 
+```{r discrimination}
+
+discrimination <- bm4 %>% VarCorr %>% as.data.frame %>% 
+  (function (x) x$p_no.sd.Estimate)
+
+MEDT2.items$discrimination <- discrimination
+```
+## Derive item difficulty parameters
+
+```{r item difficulty}
+
+require(magrittr)
+MEDT2.items$discrimination<-8.345
+MEDT2.items$difficulty <- predict(
+  bm4,
+  newdata = MEDT2.items,
+  re_formula = NA  # this instructs the model to predict without random effects
+)[,1] %>% 
+  (function (x) ((x-0.22)/0.77)) %>%
+  (function (x) logit_scaled(x)) %>%
+  as.numeric %>% 
+  multiply_by(- 1) %>% 
+  divide_by(MEDT2.items$discrimination)
+
+MEDT2.items$guessing <- 0.5
+MEDT2.items$inattention <- 0.06
+
+write.csv(MEDT2.items,"data/MEDT2.itemparams.csv",row.names=F)
 ```
