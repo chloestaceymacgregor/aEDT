@@ -292,7 +292,7 @@ acc_bm4
 
 ## R2 
 ```{r r2}
-rsq_bayes <- bayes_R2(bm6,
+rsq_bayes <- bayes_R2(bm4,
                       resp = NULL,
                       summary = T,
                       robust = F,
