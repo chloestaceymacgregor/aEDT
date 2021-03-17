@@ -253,46 +253,64 @@ bm4<-brm(bf(score ~ guess + (1 - guess - inatt) * inv_logit(eta),
                          nlpar = "inatt", 
                          lb = 0, 
                          ub = 0.1)),
-         auto_prior(bm4,data,FALSE),
+         ac,
          iter = 10000
 )
 
 summary(bm4)
 ```
 
-### 7. Accept bm4 as final model and Compute R2
+### 7.Bmodel 5: include prior for random intercept
 
-```{r r2}
-
-
-rsq_bayes <- bayes_R2(bm4,
-                      resp = NULL,
-                      summary = T,
-                      robust = F,
-                      probs = c(0.025, 0.975)
-                      )
-rsq_bayes
+```{r bm5}
+bm5<-formula(score~ tece+melody+instrument+(1|p_no))
+if(requireNamespace("brms",quietly=TRUE))
+  auto_prior(bm5,data,FALSE)
+ac2<-auto_prior(bm5,data,FALSE)
+bm5<-brm(bf(score ~ guess + (1 - guess - inatt) * inv_logit(eta),
+            eta ~ 0 + tece + melody + instrument + (1|p_no), 
+            guess ~ 1, 
+            inatt ~ 1, 
+            nl = TRUE),
+         data = data, 
+         family = bernoulli("identity"),
+         prior = c(prior(normal(0, 5), 
+                         nlpar = "eta"),
+                   prior(beta(1, 1), 
+                         nlpar = "guess", 
+                         lb = 0, 
+                         ub = 0.5),
+                   prior(beta(1, 1), 
+                         nlpar = "inatt", 
+                         lb = 0, 
+                         ub = 0.1)),
+                   prior(cauchy(0,2),
+                          nlpar="p_no",
+                          class=sd),
+         ac2,
+         iter = 10000
+)
 ```
 
-### 8. Compute accuracy and R2 for bm4
+### 8.Accept bm5 as final model and Compute R2 and accuracy
 
 ## Accuracy
 ```{r acc}
 
 
-predictions <- predict(bm4,
+predictions <- predict(bm5,
                        type = "response")
 predictions <- predictions[,1]
 acc.tab <- table(data$score,
                       round(predictions,
                             digits = 0))
-acc_bm4 <- sum(diag(acc.tab)) / sum(acc.tab)
-acc_bm4
+acc_bm5 <- sum(diag(acc.tab)) / sum(acc.tab)
+acc_bm5
 ```
 
 ## R2 
 ```{r r2}
-rsq_bayes <- bayes_R2(bm4,
+rsq_bayes <- bayes_R2(bm5,
                       resp = NULL,
                       summary = T,
                       robust = F,
@@ -319,19 +337,14 @@ MEDT2.items <- data.frame(
 ## Calculate discrimination parameter 
 ```{r discrimination}
 
-discrimination <- bm4 %>% VarCorr %>% as.data.frame %>% 
+discrimination <- bm5 %>% VarCorr %>% as.data.frame %>% 
   (function (x) x$p_no.sd.Estimate)
 
-MEDT2.items$discrimination <- discrimination
-```
-## Derive item difficulty parameters
-
-```{r item difficulty}
-
 require(magrittr)
-MEDT2.items$discrimination<-8.345
+
+MEDT2.items$discrimination <- discrimination
 MEDT2.items$difficulty <- predict(
-  bm4,
+  bm5,
   newdata = MEDT2.items,
   re_formula = NA  # this instructs the model to predict without random effects
 )[,1] %>% 
@@ -341,8 +354,41 @@ MEDT2.items$difficulty <- predict(
   multiply_by(- 1) %>% 
   divide_by(MEDT2.items$discrimination)
 
-MEDT2.items$guessing <- 0.5
-MEDT2.items$inattention <- 0.06
+MEDT2.items$guessing <- 0.5 # this value has been retrieved from the 'guess_Intercept' estimate in the output of bm5
+MEDT2.items$inattention <- 0.06 # this value has been retrieved from the 'innat_Intercept' estimate in the output of bm5
 
 write.csv(MEDT2.items,"data/MEDT2.itemparams.csv",row.names=F)
 ```
+
+### 10. Posterior Checks
+```{ r checks}
+## Extract random effects intercept for participants from bm5
+library(lme4)
+rebm5<-ranef(bm5)
+
+## Create histogram to check distribution of random effects
+rebm5<-do.call(rbind,rebm5)
+hist(rebm5)
+
+## Check correlation between random effects and emotions subscale score
+reandemotions<-read.csv("/Users/chloemacgregor/Documents/MEDT/MEDT2/Experiment 1/Analysis/data/checks/random effects and emotions data.csv")
+
+reandemotions$Reffects<-as.numeric(reandemotions$Reffects)
+reandemotions$emotions.score<-as.numeric(reandemotions$emotions.score)
+cor(reandemotions$Reffects,reandemotions$emotions.score,method="pearson",use="complete.obs")
+# 33.8%
+
+## Brms correlations
+bcor<-brm(data=reande,family=gaussian,mvbind(Reffects,emotions)~1, 
+          prior=c(prior(normal(0,100), class=Intercept),
+                  prior(normal(0,100), class=sigma, resp=Reffects),
+                  prior(normal(0,100),class=sigma,resp=emotions),
+                  prior(lkj(1),class=rescor)),
+          iter=2000, warmup=500,chains=4, seed=19022021)
+                  
+# Estimate=.34, error=.04, LCI=.26, UCI=.26, Rhat=1
+
+# Check posterior distribution against predictive samples
+pp_check(bm5,nsamples=100)
+```
+
