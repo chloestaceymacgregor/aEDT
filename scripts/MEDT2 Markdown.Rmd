@@ -353,7 +353,7 @@ MEDT2.items$difficulty <- predict(
   divide_by(discrimination)
 
 MEDT2.items$guessing <- 0.5 # this value has been retrieved from the 'guess_Intercept' estimate in the output of bm5
-MEDT2.items$inattention <- 0.06 # this value has been retrieved from the 'innat_Intercept' estimate in the output of bm5
+MEDT2.items$inattention <- 0.94 # this value has been retrieved from the 'innat_Intercept' estimate in the output of bm5
 
 write.csv(MEDT2.items,"data/MEDT2.itemparams.csv",row.names=F)
 ```
@@ -383,7 +383,8 @@ bcor<-brm(data=reande,family=gaussian,mvbind(Reffects,emotions)~1,
                   prior(normal(0,100),class=sigma,resp=emotions),
                   prior(lkj(1),class=rescor)),
           iter=2000, warmup=500,chains=4, seed=19022021)
-                  
+summary(bcor)
+
 # Estimate=.34, error=.04, LCI=.26, UCI=.26, Rhat=1
 
 # Check posterior distribution against predictive samples
