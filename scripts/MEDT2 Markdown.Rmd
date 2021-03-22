@@ -341,18 +341,16 @@ discrimination <- bm5 %>% VarCorr %>% as.data.frame %>%
   (function (x) x$p_no.sd.Estimate)
 
 require(magrittr)
-
-MEDT2.items$discrimination <- discrimination
 MEDT2.items$difficulty <- predict(
   bm5,
   newdata = MEDT2.items,
   re_formula = NA  # this instructs the model to predict without random effects
 )[,1] %>% 
-  (function (x) ((x-0.22)/0.77)) %>%
+  (function (x) ((x-0.5)/.44)) %>%
   (function (x) logit_scaled(x)) %>%
   as.numeric %>% 
-  multiply_by(- 1) %>% 
-  divide_by(MEDT2.items$discrimination)
+  multiply_by(- 1) %>%
+  divide_by(discrimination)
 
 MEDT2.items$guessing <- 0.5 # this value has been retrieved from the 'guess_Intercept' estimate in the output of bm5
 MEDT2.items$inattention <- 0.06 # this value has been retrieved from the 'innat_Intercept' estimate in the output of bm5
@@ -361,7 +359,7 @@ write.csv(MEDT2.items,"data/MEDT2.itemparams.csv",row.names=F)
 ```
 
 ### 10. Posterior Checks
-```{ r checks}
+```{r checks}
 ## Extract random effects intercept for participants from bm5
 library(lme4)
 rebm5<-ranef(bm5)
